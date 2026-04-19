@@ -361,13 +361,13 @@ export async function renderBmp(png: Buffer, options: RenderBmpOptions = {}) {
 	buffer.writeUInt32LE(numColors, 46); // Total Colors
 	buffer.writeUInt32LE(numColors, 50); // Important Colors
 
-	// Color Palette - generate gray shades (lightest to darkest)
-	// Index 0 = white (lightest), Index N-1 = black (darkest)
+	// Color Palette - generate gray shades (darkest to lightest)
+	// Index 0 = black (darkest), Index N-1 = white (lightest)
 	const paletteOffset = fileHeaderSize + infoHeaderSize;
 	const paletteStep = 255 / (grayscale - 1);
 	for (let i = 0; i < grayscale; i++) {
-		// Generate from white (255) to black (0)
-		const grayValue = Math.round(255 - i * paletteStep);
+		// Generate from black (0) to white (255)
+		const grayValue = Math.round(i * paletteStep);
 		// BMP palette format: BGR + reserved byte (0x00)
 		const paletteEntry = (grayValue << 16) | (grayValue << 8) | grayValue;
 		buffer.writeUInt32LE(paletteEntry, paletteOffset + i * 4);
@@ -377,10 +377,10 @@ export async function renderBmp(png: Buffer, options: RenderBmpOptions = {}) {
 	const dataOffset = fileHeaderSize + infoHeaderSize + paletteSize;
 
 	// Create a mapping function from quantized grayscale value to palette index
-	// Palette: index 0 = white (255), index N-1 = black (0)
+	// Palette: index 0 = black (0), index N-1 = white (255)
 	const valueToIndex = (value: number): number => {
-		// Map from 0-255 to palette index (0 = white, N-1 = black)
-		return grayscale - 1 - Math.round(value / paletteStep);
+		// Map from 0-255 to palette index (0 = black, N-1 = white)
+		return Math.round(value / paletteStep);
 	};
 
 	// Process pixels based on bit depth
@@ -405,16 +405,16 @@ export async function renderBmp(png: Buffer, options: RenderBmpOptions = {}) {
 
 					if (gray < 10) {
 						// Pure black pixel
-						paletteIndex = 1;
+						paletteIndex = 0;
 					} else if (gray > 240) {
 						// Pure white pixel
-						paletteIndex = 0;
+						paletteIndex = 1;
 					} else if (isEdge[idx]) {
 						// On an edge (likely text) - round to black for better contrast
-						paletteIndex = gray < 128 ? 1 : 0;
+						paletteIndex = gray < 128 ? 0 : 1;
 					} else {
 						// Not on an edge (likely in an image) - use dithered result
-						paletteIndex = ditheredValue < 128 ? 1 : 0; // Values are either 0 or 255
+						paletteIndex = ditheredValue < 128 ? 0 : 1; // Values are either 0 or 255
 					}
 
 					// Invert if needed
@@ -422,8 +422,8 @@ export async function renderBmp(png: Buffer, options: RenderBmpOptions = {}) {
 						paletteIndex = grayscale - 1 - paletteIndex;
 					}
 
-					// For 1-bit, palette index 1 = black, index 0 = white
-					// Set bit to 1 if palette index is 1 (black)
+					// For 1-bit, palette index 0 = black, index 1 = white
+					// Set bit to 1 if palette index is 1 (white)
 					if (paletteIndex === grayscale - 1) {
 						byte |= 1 << (7 - bit);
 					}
@@ -446,13 +446,13 @@ export async function renderBmp(png: Buffer, options: RenderBmpOptions = {}) {
 
 					if (gray < 10) {
 						// Pure black pixel
-						paletteIndex = grayscale - 1;
+						paletteIndex = 0;
 					} else if (gray > 240) {
 						// Pure white pixel
-						paletteIndex = 0;
+						paletteIndex = grayscale - 1;
 					} else if (isEdge[idx]) {
 						// On an edge (likely text) - round to black or white for better contrast
-						paletteIndex = gray < 128 ? grayscale - 1 : 0;
+						paletteIndex = gray < 128 ? 0 : grayscale - 1;
 					} else {
 						// Not on an edge (likely in an image) - use dithered result
 						paletteIndex = valueToIndex(ditheredValue);
@@ -484,13 +484,13 @@ export async function renderBmp(png: Buffer, options: RenderBmpOptions = {}) {
 
 					if (gray < 10) {
 						// Pure black pixel
-						paletteIndex = grayscale - 1;
+						paletteIndex = 0;
 					} else if (gray > 240) {
 						// Pure white pixel
-						paletteIndex = 0;
+						paletteIndex = grayscale - 1;
 					} else if (isEdge[idx]) {
 						// On an edge (likely text) - round to black or white for better contrast
-						paletteIndex = gray < 128 ? grayscale - 1 : 0;
+						paletteIndex = gray < 128 ? 0 : grayscale - 1;
 					} else {
 						// Not on an edge (likely in an image) - use dithered result
 						paletteIndex = valueToIndex(ditheredValue);
